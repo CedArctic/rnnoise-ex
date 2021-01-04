@@ -315,23 +315,37 @@ static int compute_frame_features(DenoiseState *st, kiss_fft_cpx *X, kiss_fft_cp
   int pitch_index;
   float gain;
   float *(pre[1]);
+  // float** pre;
   float tmp[NB_BANDS];
   float follow, logMax;
+
+  // FFT and energy
   frame_analysis(st, X, Ex, in);
+
+  // Copy last part of pitch buffer to the beginning and fill the rest with noisy frame
   RNN_MOVE(st->pitch_buf, &st->pitch_buf[FRAME_SIZE], PITCH_BUF_SIZE-FRAME_SIZE);
   RNN_COPY(&st->pitch_buf[PITCH_BUF_SIZE-FRAME_SIZE], in, FRAME_SIZE);
+
+  // Pointer to pitch buffer
   pre[0] = &st->pitch_buf[0];
+
+  // Find pitch
   pitch_downsample(pre, pitch_buf, PITCH_BUF_SIZE, 1);
   pitch_search(pitch_buf+(PITCH_MAX_PERIOD>>1), pitch_buf, PITCH_FRAME_SIZE,
                PITCH_MAX_PERIOD-3*PITCH_MIN_PERIOD, &pitch_index);
   pitch_index = PITCH_MAX_PERIOD-pitch_index;
 
+
   gain = remove_doubling(pitch_buf, PITCH_MAX_PERIOD, PITCH_MIN_PERIOD,
           PITCH_FRAME_SIZE, &pitch_index, st->last_period, st->last_gain);
   st->last_period = pitch_index;
   st->last_gain = gain;
+
+  // x(n) = x(n-T)
   for (i=0;i<WINDOW_SIZE;i++)
     p[i] = st->pitch_buf[PITCH_BUF_SIZE-WINDOW_SIZE-pitch_index+i];
+
+
   apply_window(p);
   forward_transform(P, p);
   compute_band_energy(Ep, P);

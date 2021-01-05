@@ -14,7 +14,8 @@ from tensorflow.keras.constraints import Constraint
 NB_BANDS = 22
 FRAME_SIZE = 480
 WINDOW_SIZE = FRAME_SIZE * 2
-FREQ_SIZE = FRAME_SIZE + 1
+# FREQ_SIZE = FRAME_SIZE + 1
+FREQ_SIZE = WINDOW_SIZE
 MAX_PITCH = 768
 FRAME_SIZE_SHIFT = 2
 eband5ms= np.array([0,  1,  2,  3,  4,  5,  6,  7,  8, 10, 12, 14, 16, 20, 24, 28, 34, 40, 48, 60, 78, 100])
@@ -92,6 +93,7 @@ def pitch_filter(X, P, Ex, Ep, Exp, g):
         # resultX[i].real *= normf[i]
         # resultX[i].imag *= normf[i]
 
+    return resultX
 
 # Compute band correlation
 def compute_band_corr(X, P):
@@ -172,7 +174,7 @@ vadOutput = np.reshape(vadOutput, (nb_sequences * window_size, 1))
 x_train = np.reshape(x_train, (nb_sequences * window_size, 42))
 
 # Load audio data
-y, sr = sf.read('../src/noisySpeechSamples.raw', channels=1, samplerate=48000, subtype='FLOAT')
+y, sr = sf.read('p232_005.wav')
 
 # Split to 20ms overlaping frames
 # 960 is 20ms for 48000 sampling rate, 480 adds 10ms overlap at the beginning
@@ -180,6 +182,12 @@ inWindows = librosa.util.frame(x=y, frame_length=960, hop_length=480, axis=0)
 
 # Calculate pitches using the input features
 pitches = [round(768-(x/0.1 + 300)) for x in x_train[:,40]]
+
+# Declare gains used
+finalGains = np.zeros(NB_BANDS)
+
+# Declare output array
+outData = np.zeros(len(y))
 
 windowIndex = 0
 # Fourier transform each window, apply gains and inverse FFT
@@ -225,10 +233,27 @@ for window in inWindows:
         ExP[i] = ExP[i]/math.sqrt(0.001+EvWindow[i]*EvP[i])
 
     # Apply pitch filter
-    X = pitch_filter(fftWindow, fftP, EvWindow, EvP, ExP, gainsOutput[i,:])
+    X = pitch_filter(fftWindow, fftP, EvWindow, EvP, ExP, gainsOutput[windowIndex,:])
+
+    # Gain Smoothing
+    alpha = 0.6
+    for i in range(NB_BANDS):
+        finalGains[i] = max(gainsOutput[windowIndex,i], alpha * finalGains[i])
+
+    # Interpolate band gains
+    gf = interp_band_gain(finalGains)
 
     # Apply gains
+    for i in range(FREQ_SIZE):
+        X[i] = complex((X[i].real * gf[i]), (X[i].imag * gf[i]))
+
+    # Synthesize frames
+    x = np.fft.ifft(X, n=WINDOW_SIZE)
+    vx = vorbis_window(x)
+    outData[(windowIndex * FRAME_SIZE):((windowIndex + 2) * FRAME_SIZE)] = np.add(outData[(windowIndex * FRAME_SIZE):((windowIndex + 2) * FRAME_SIZE)], vx)
 
     # Increment frame index
     windowIndex += 1
 
+# Write output file
+sf.write('cleaned_audio.wav', outData, sr, subtype='PCM_16')

@@ -6,13 +6,21 @@ import h5py
 import numpy as np
 import librosa
 import soundfile as sf
+import math
 from tensorflow import keras
 from tensorflow.keras.constraints import Constraint
 
+# Global constants declarations
+NB_BANDS = 22
+FRAME_SIZE = 480
+WINDOW_SIZE = FRAME_SIZE * 2
+FREQ_SIZE = FRAME_SIZE + 1
+MAX_PITCH = 768
+FRAME_SIZE_SHIFT = 2
+eband5ms= np.array([0,  1,  2,  3,  4,  5,  6,  7,  8, 10, 12, 14, 16, 20, 24, 28, 34, 40, 48, 60, 78, 100])
+
 # Calculate energy for each subband
 def energy(X):
-  NB_BANDS = 22
-  eband5ms= np.array([0,  1,  2,  3,  4,  5,  6,  7,  8, 10, 12, 14, 16, 20, 24, 28, 34, 40, 48, 60, 78, 100])
   sum = [0] * NB_BANDS
   for i in range(21):
     band_size = 4*(eband5ms[i+1]-eband5ms[i])
@@ -37,11 +45,72 @@ def vorbis_window(x):
     x = np.multiply(x,win)
     return x
 
-# Pitch Filter
-def pitch_filter(X, pitch, g):
+# Interpolate band gain
+def interp_band_gain(bandE):
     
-    # Compute Ex (as vallin does it)
-    Ex = energy(X)
+    g = [0] * FREQ_SIZE
+
+    for i in range(NB_BANDS - 1):
+        band_size = (eband5ms[i+1]-eband5ms[i])<<FRAME_SIZE_SHIFT
+        for j in range(band_size):
+            frac = j/band_size
+            g[(eband5ms[i]<<FRAME_SIZE_SHIFT) + j] = (1-frac)*bandE[i] + frac*bandE[i+1]
+
+    return g
+
+# Pitch Filter
+def pitch_filter(X, P, Ex, Ep, Exp, g):
+    
+    r = [0] * NB_BANDS
+
+    resultX = []
+    
+    for i in range(NB_BANDS):
+        if Exp[i]>g[i] :
+            r[i] = 1
+        else:
+            r[i] = ((Exp[i])**2) *(1-(g[i])**2)/(0.001 + (g[i]**2) * (1-(Exp[i])**2))
+        
+        r[i] = math.sqrt(min(1, max(0, r[i])))
+        r[i] *= math.sqrt(Ex[i]/(1e-8+Ep[i]))
+    
+    rf = interp_band_gain(r)
+
+    for i in range(FREQ_SIZE):
+        resultX.append(complex((X[i].real + rf[i]*P[i].real),(X[i].imag + rf[i]*P[i].imag)))
+        # resultX[i].real += rf[i]*P[i].real
+        # resultX[i].imag += rf[i]*P[i].imag
+    
+    newE = energy(resultX)
+
+    norm = [(math.sqrt(Ex[i]/(1e-8+newE[i]))) for i in range(NB_BANDS)]
+
+    normf = interp_band_gain(norm)
+
+    for i in range(FREQ_SIZE):
+        resultX[i] = complex((resultX[i].real * normf[i]), resultX[i].imag * normf[i])
+        # resultX[i].real *= normf[i]
+        # resultX[i].imag *= normf[i]
+
+
+# Compute band correlation
+def compute_band_corr(X, P):
+
+    sum = [0] * NB_BANDS
+
+    for i in range(NB_BANDS - 1):
+        band_size = (eband5ms[i+1]-eband5ms[i]) << FRAME_SIZE_SHIFT
+        for j in range(band_size):
+            frac = j / band_size
+            tmp = X[(eband5ms[i]<<FRAME_SIZE_SHIFT) + j].real * P[(eband5ms[i]<<FRAME_SIZE_SHIFT) + j].real
+            tmp += X[(eband5ms[i]<<FRAME_SIZE_SHIFT) + j].imag * P[(eband5ms[i]<<FRAME_SIZE_SHIFT) + j].imag
+            sum[i] += (1-frac)*tmp
+            sum[i+1] += frac*tmp
+    
+    sum[0] *= 2
+    sum[NB_BANDS-1] *= 2
+
+    return sum
 
 # Model functions
 def my_crossentropy(y_true, y_pred):
@@ -106,24 +175,60 @@ x_train = np.reshape(x_train, (nb_sequences * window_size, 42))
 y, sr = sf.read('../src/noisySpeechSamples.raw', channels=1, samplerate=48000, subtype='FLOAT')
 
 # Split to 20ms overlaping frames
-# 960 is 20ms for 48000 sampling rate, 480 adds 5ms overlap on each side of the frame
-inFrames = librosa.util.frame(x=y, frame_length=960, hop_length=480, axis=0)
+# 960 is 20ms for 48000 sampling rate, 480 adds 10ms overlap at the beginning
+inWindows = librosa.util.frame(x=y, frame_length=960, hop_length=480, axis=0)
 
 # Calculate pitches using the input features
 pitches = [round(768-(x/0.1 + 300)) for x in x_train[:,40]]
 
-frameIndex = 0
-# Fourier transform each frame, apply gains and inverse FFT
-# for frame in frames:
+windowIndex = 0
+# Fourier transform each window, apply gains and inverse FFT
+for window in inWindows:
 
-#     # Apply vorbis window
-#     vFrame = vorbis_window(frame)
+    print(windowIndex)
 
-#     # FFT the frame
-#     fftFrame = np.fft.fft(vFrame)
+    # Apply vorbis window to window
+    vWindow = vorbis_window(window)
 
+    # FFT the window
+    fftWindow = np.fft.fft(vWindow, n=FREQ_SIZE)
+
+    # Energy of fftWindow
+    EvWindow = energy(fftWindow)
+
+    # Create the pitch buffer based on the last 3 windows
+    pitchBuffer = []
+    if windowIndex > 1:
+        pitchBuffer = np.concatenate((inWindows[windowIndex - 2][(WINDOW_SIZE - MAX_PITCH):FRAME_SIZE], inWindows[windowIndex - 1][:FRAME_SIZE], window), axis=0)
+    elif windowIndex == 1:
+        pitchBuffer = np.concatenate((np.zeros(MAX_PITCH - FRAME_SIZE), inWindows[windowIndex - 1][:FRAME_SIZE], window), axis=0)
+    elif windowIndex == 0:
+        pitchBuffer = np.concatenate((np.zeros(MAX_PITCH), window), axis=0)
+
+    # Calculate p buffer
+    p = pitchBuffer[pitches[windowIndex] : pitches[windowIndex] + WINDOW_SIZE]
+
+    # Apply vorbis window on p
+    vP = vorbis_window(p)
+
+    # FFT of vP
+    fftP = np.fft.fft(vP, n=FREQ_SIZE)
+
+    # Energy of vP
+    EvP = energy(fftP)
+
+    # Compute ExP
+    ExP = compute_band_corr(fftWindow, fftP)
+
+    # Normalize ExP
+    for i in range(NB_BANDS):
+        ExP[i] = ExP[i]/math.sqrt(0.001+EvWindow[i]*EvP[i])
+
+    # Apply pitch filter
+    X = pitch_filter(fftWindow, fftP, EvWindow, EvP, ExP, gainsOutput[i,:])
+
+    # Apply gains
 
     # Increment frame index
-    frameIndex += 1
-
+    windowIndex += 1
 

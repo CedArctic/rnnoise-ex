@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 
+import sys
 import h5py
 import numpy as np
 import librosa
@@ -146,20 +147,20 @@ class WeightClip(Constraint):
 
 
 # Load model
-model = keras.models.load_model(filepath='weights.hdf5', custom_objects={'WeightClip': WeightClip, 
+model = keras.models.load_model(filepath='model_ex.hdf5', custom_objects={'WeightClip': WeightClip, 
 'mycost':mycost, 'my_crossentropy':my_crossentropy, 'mymask':mymask, 'msse': msse, 'my_accuracy': my_accuracy})
 
 # Load & reshape featuers data
 print('Loading data...')
-with h5py.File('training.h5', 'r') as hf:
+with h5py.File('training_ex.h5', 'r') as hf:
     all_data = hf['data'][:]
 print('done.')
 
 window_size = 2000
 nb_sequences = len(all_data)//window_size
 print(nb_sequences, ' sequences')
-x_train = all_data[:nb_sequences*window_size, :42]
-x_train = np.reshape(x_train, (nb_sequences, window_size, 42))
+x_train = all_data[:nb_sequences*window_size, :47]
+x_train = np.reshape(x_train, (nb_sequences, window_size, 47))
 
 # Get output
 output = model.predict(x_train)
@@ -171,10 +172,10 @@ gainsOutput = np.reshape(gainsOutput, (nb_sequences * window_size, 22))
 vadOutput = np.reshape(vadOutput, (nb_sequences * window_size, 1))
 
 # Transform input features for convenience
-x_train = np.reshape(x_train, (nb_sequences * window_size, 42))
+x_train = np.reshape(x_train, (nb_sequences * window_size, 47))
 
 # Load audio data
-y, sr = sf.read('p232_005.wav')
+y, sr = sf.read(sys.argv[1])
 
 # Split to 20ms overlaping frames
 # 960 is 20ms for 48000 sampling rate, 480 adds 10ms overlap at the beginning
@@ -256,4 +257,4 @@ for window in inWindows:
     windowIndex += 1
 
 # Write output file
-sf.write('cleaned_audio.wav', outData, sr, subtype='PCM_16')
+sf.write(sys.argv[2], outData, sr, subtype='PCM_16')

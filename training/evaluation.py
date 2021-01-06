@@ -15,7 +15,7 @@ from tensorflow.keras.constraints import Constraint
 NB_BANDS = 22
 FRAME_SIZE = 480
 WINDOW_SIZE = FRAME_SIZE * 2
-# FREQ_SIZE = FRAME_SIZE + 1
+#FREQ_SIZE = FRAME_SIZE + 1
 FREQ_SIZE = WINDOW_SIZE
 MAX_PITCH = 768
 FRAME_SIZE_SHIFT = 2
@@ -24,16 +24,16 @@ eband5ms= np.array([0,  1,  2,  3,  4,  5,  6,  7,  8, 10, 12, 14, 16, 20, 24, 2
 # Calculate energy for each subband
 def energy(X):
   sum = [0] * NB_BANDS
-  for i in range(21):
-    band_size = 4*(eband5ms[i+1]-eband5ms[i])
+  for i in range(NB_BANDS - 1):
+    band_size = (eband5ms[i+1]-eband5ms[i]) << FRAME_SIZE_SHIFT
     for j in range(band_size):
       frac = j/band_size
-      tmp = (X[4*eband5ms[i]+j].real)**2+(X[4*eband5ms[i]+j].imag)**2
+      tmp = (X[(eband5ms[i]<<FRAME_SIZE_SHIFT) + j].real)**2+(X[(eband5ms[i]<<FRAME_SIZE_SHIFT) + j].imag)**2
       sum[i] += (1-frac)*tmp
       sum[i+1] += frac*tmp
   
   sum[0] *= 2
-  sum[22 - 1] *= 2
+  sum[NB_BANDS - 1] *= 2
   Ex = [0] * NB_BANDS
   for i in range(NB_BANDS):
     Ex[i] = sum[i]
@@ -90,7 +90,7 @@ def pitch_filter(X, P, Ex, Ep, Exp, g):
     normf = interp_band_gain(norm)
 
     for i in range(FREQ_SIZE):
-        resultX[i] = complex((resultX[i].real * normf[i]), resultX[i].imag * normf[i])
+        resultX[i] = complex(resultX[i].real * normf[i], resultX[i].imag * normf[i])
         # resultX[i].real *= normf[i]
         # resultX[i].imag *= normf[i]
 
@@ -182,7 +182,7 @@ y, sr = sf.read(sys.argv[1])
 inWindows = librosa.util.frame(x=y, frame_length=960, hop_length=480, axis=0)
 
 # Calculate pitches using the input features
-pitches = [round(768-(x/0.1 + 300)) for x in x_train[:,40]]
+pitches = [round(MAX_PITCH-(x/0.01 + 300)) for x in x_train[:,40]]
 
 # Declare gains used
 finalGains = np.zeros(NB_BANDS)
@@ -235,6 +235,8 @@ for window in inWindows:
 
     # Apply pitch filter
     X = pitch_filter(fftWindow, fftP, EvWindow, EvP, ExP, gainsOutput[windowIndex,:])
+    # Disable pitch filter
+    #X = fftWindow
 
     # Gain Smoothing
     alpha = 0.6
@@ -255,6 +257,17 @@ for window in inWindows:
 
     # Increment frame index
     windowIndex += 1
+
+# Normalize energy
+eClean = 0
+for element in outData:
+    eClean += element ** 2
+eNoisy = 0
+for element in y:
+    eNoisy += element ** 2
+ratio = (eNoisy / eClean)
+outData = outData * ratio
+outData /= max(outData)
 
 # Write output file
 sf.write(sys.argv[2], outData, sr, subtype='PCM_16')

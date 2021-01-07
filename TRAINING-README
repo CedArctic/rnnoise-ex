@@ -1,16 +1,43 @@
+# Training
+
 (1) Compile Valin's feature extraction application as modified by us: 
     cd src ; ./compile.sh
 
-(2) Run the feature extraction application that also dumps the raw noisy samples in ./src/extractedSamples
-    ./denoise_training signal.raw noise.raw count > training_ex.f32
+(2) Concatenate speech and noise tracks and convert them to raw format
+    cd ../speech; sox $(ls *.wav) ../trainingSpeech.wav; sox trainingSpeech.wav trainingSpeech.raw
+    cd ../noise; sox $(ls *.wav) trainingNoise.wav; sox trainingNoise.wav trainingNoise.raw
 
-    (note the matrix size and replace 500000 87 below)
+(3) Run the feature extraction application that also dumps the raw noisy samples in ./src/noisySpeechSamples.raw
+    It is advised to use 500000 or more for count
+    cd ../src;
+    ./denoise_training ../speech/trainingSpeech.raw ../noise/trainingNoise.raw count > trainingRNNoiseFeatures.f32
 
-(2) Convert the raw samples dumped above to wave files and clip them at the exact appropriate length to avoid problems.
-    48000 khz sampling rate and a 480 samples frame window 
+(4) Extract extended features by running featureExtraction.py. Features will be saved as trainingExtendedFeatures.bin
+    cd ../src; python ./featureExtraction.py training noisySpeechSamples.raw trainingExtendedFeatures.bin
 
-(3) cd training ; ./bin2hdf5.py ../src/training_ex.f32 ../src/extendedFeatures.bin 500000 87 training_ex.h5
+(5) Join feature sets using bin2hdf5
+    cd ../training; ./bin2hdf5.py ../src/trainingRNNoiseFeatures.f32 ../src/trainingExtendedFeatures.bin trainingFeatures.h5
 
-(4) ./rnn_train.py
+(6) Train RNNoise
+    ./rnn_train.py trainingFeatures.h5 trainedModel.hdf5
 
-(5) ./dump_rnn.py weights.hdf5 ../src/rnn_data.c ../src/rnn_data.h
+# Evaluation
+
+(1) Compile the RNNoise feature extractor
+    cd ../featureExtraction
+    gcc -Wall -o feature_extractor -lm feature_extractor.c denoise.c ../src/kiss_fft.c ../src/rnn_data.c ../src/pitch.c ../src/rnn.c ../src/celt_lpc.c
+
+(2) Convert desired audio track to raw
+    sox testAudio.wav testAudio.raw
+
+(3) Extract RNNoise features using the feature extractor
+    ./feature_extractor testAudio.raw testAudioFeatures.f32
+
+(4) Extract extended features using featureExtraction.py
+    python ../training/featureExtraction.py testing testAudio.wav testAudioExtendedFeatures.bin
+
+(5) Join feature sets using bin2hdf5
+    cd ../training; ./bin2hdf5.py ../featureExtraction/testAudioFeatures.f32 ../featureExtraction/testAudioExtendedFeatures.bin testAudioFeatures.h5
+
+(6) Run RNNoise using evaluation.py
+    python ./evaluation.py trainedModel.hdf5 testAudioFeatures.h5 ../featureExtraction/testAudio.wav testAudioClean.wav

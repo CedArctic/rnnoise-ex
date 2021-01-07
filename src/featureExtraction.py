@@ -2,11 +2,15 @@
 import numpy as np
 import librosa
 import soundfile as sf
+import sys
 
-# Load the sample wav file with its sampling rate
-#y, sr = librosa.load("processedFloatTrimmed.wav", sr=None)
-#y, sr = librosa.load("6.wav", sr=None)
-y, sr = sf.read('noisySpeechSamples.raw', channels=1, samplerate=48000, subtype='FLOAT')
+# Load input
+if sys.argv[1] == 'training':
+    # For training:
+    y, sr = sf.read('noisySpeechSamples.raw', channels=1, samplerate=48000, subtype='FLOAT')
+else:
+    # Load the sample wav file with its sampling rate
+    y, sr = sf.read(sys.argv[2])
 
 # Split to 20ms overlaping frames
 # 960 is 20ms for 48000 sampling rate, 480 adds 10ms overlap with the previous frame
@@ -31,6 +35,6 @@ spectral_rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr, n_fft=960, hop_l
 features = np.array([rms[0][:-1], spectral_centroid[0][:-1], spectral_bandwidth[0][:-1], spectral_flatness[0][:-1],spectral_rolloff[0][:-1]]).T
 
 # Write results
-outFile = open("extendedFeatures.bin", "wb")
+outFile = open(sys.argv[3], "wb")
 np.save(outFile, features)
 outFile.close()

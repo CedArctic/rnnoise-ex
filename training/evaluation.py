@@ -147,23 +147,23 @@ class WeightClip(Constraint):
 
 
 # Load model
-model = keras.models.load_model(filepath='model_ex.hdf5', custom_objects={'WeightClip': WeightClip, 
+model = keras.models.load_model(filepath=sys.argv[1], custom_objects={'WeightClip': WeightClip, 
 'mycost':mycost, 'my_crossentropy':my_crossentropy, 'mymask':mymask, 'msse': msse, 'my_accuracy': my_accuracy})
 
-# Load & reshape featuers data
+# Load & reshape features data
 print('Loading data...')
-with h5py.File('training_ex.h5', 'r') as hf:
+with h5py.File(sys.argv[2], 'r') as hf:
     all_data = hf['data'][:]
 print('done.')
 
-window_size = 2000
+window_size = 1
 nb_sequences = len(all_data)//window_size
 print(nb_sequences, ' sequences')
-x_train = all_data[:nb_sequences*window_size, :47]
-x_train = np.reshape(x_train, (nb_sequences, window_size, 47))
+x_input = all_data[:nb_sequences*window_size, :all_data.shape[1]]
+x_input = np.reshape(x_input, (nb_sequences, window_size, all_data.shape[1]))
 
 # Get output
-output = model.predict(x_train)
+output = model.predict(x_input)
 vadOutput = output[1]
 gainsOutput = output[0]
 
@@ -172,17 +172,17 @@ gainsOutput = np.reshape(gainsOutput, (nb_sequences * window_size, 22))
 vadOutput = np.reshape(vadOutput, (nb_sequences * window_size, 1))
 
 # Transform input features for convenience
-x_train = np.reshape(x_train, (nb_sequences * window_size, 47))
+x_input = np.reshape(x_input, (nb_sequences * window_size, all_data.shape[1]))
 
 # Load audio data
-y, sr = sf.read(sys.argv[1])
+y, sr = sf.read(sys.argv[3])
 
 # Split to 20ms overlaping frames
 # 960 is 20ms for 48000 sampling rate, 480 adds 10ms overlap at the beginning
 inWindows = librosa.util.frame(x=y, frame_length=960, hop_length=480, axis=0)
 
 # Calculate pitches using the input features
-pitches = [round(MAX_PITCH-(x/0.01 + 300)) for x in x_train[:,40]]
+pitches = [round(MAX_PITCH-(x/0.01 + 300)) for x in x_input[:,40]]
 
 # Declare gains used
 finalGains = np.zeros(NB_BANDS)
@@ -194,7 +194,8 @@ windowIndex = 0
 # Fourier transform each window, apply gains and inverse FFT
 for window in inWindows:
 
-    print(windowIndex)
+    # Print currently processed window number
+    #print(windowIndex)
 
     # Apply vorbis window to window
     vWindow = vorbis_window(window)
@@ -208,6 +209,7 @@ for window in inWindows:
     # Create the pitch buffer based on the last 3 windows
     pitchBuffer = []
     if windowIndex > 1:
+        # [max_pitch-frame_size][frame][frame][frame]
         pitchBuffer = np.concatenate((inWindows[windowIndex - 2][(WINDOW_SIZE - MAX_PITCH):FRAME_SIZE], inWindows[windowIndex - 1][:FRAME_SIZE], window), axis=0)
     elif windowIndex == 1:
         pitchBuffer = np.concatenate((np.zeros(MAX_PITCH - FRAME_SIZE), inWindows[windowIndex - 1][:FRAME_SIZE], window), axis=0)
@@ -270,4 +272,4 @@ outData = outData * ratio
 outData /= max(outData)
 
 # Write output file
-sf.write(sys.argv[2], outData, sr, subtype='PCM_16')
+sf.write(sys.argv[4], outData, sr, subtype='PCM_16')

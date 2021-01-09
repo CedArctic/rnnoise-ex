@@ -18,8 +18,7 @@ import glob
 NB_BANDS = 22
 FRAME_SIZE = 480
 WINDOW_SIZE = FRAME_SIZE * 2
-#FREQ_SIZE = FRAME_SIZE + 1
-FREQ_SIZE = WINDOW_SIZE
+FREQ_SIZE = FRAME_SIZE + 1
 MAX_PITCH = 768
 FRAME_SIZE_SHIFT = 2
 eband5ms= np.array([0,  1,  2,  3,  4,  5,  6,  7,  8, 10, 12, 14, 16, 20, 24, 28, 34, 40, 48, 60, 78, 100])
@@ -214,7 +213,10 @@ for audioFile in audioFiles:
         vWindow = vorbis_window(window)
 
         # FFT the window
-        fftWindow = np.fft.fft(vWindow, n=FREQ_SIZE)
+        fftWindow = np.fft.fft(vWindow, n=WINDOW_SIZE)
+
+        # Slice FFT Window on FREQ_SIZE
+        fftWindow = fftWindow[:FREQ_SIZE]
 
         # Energy of fftWindow
         EvWindow = energy(fftWindow)
@@ -236,7 +238,10 @@ for audioFile in audioFiles:
         vP = vorbis_window(p)
 
         # FFT of vP
-        fftP = np.fft.fft(vP, n=FREQ_SIZE)
+        fftP = np.fft.fft(vP, n=WINDOW_SIZE)
+
+        # Zero padding on fftP
+        fftP[FRAME_SIZE+1:] = 0
 
         # Energy of vP
         EvP = energy(fftP)
@@ -266,6 +271,9 @@ for audioFile in audioFiles:
             X[i] = complex((X[i].real * gf[i]), (X[i].imag * gf[i]))
 
         # Synthesize frames
+        fftWindow = np.concatenate([fftWindow, np.zeros(FRAME_SIZE-1)])
+        for i in range(FREQ_SIZE, WINDOW_SIZE):
+            fftWindow[i] = np.complex(fftWindow[WINDOW_SIZE-i].real, -fftWindow[WINDOW_SIZE-i].imag)
         x = np.fft.ifft(X, n=WINDOW_SIZE)
         vx = vorbis_window(x)
         outData[(windowIndex * FRAME_SIZE):((windowIndex + 2) * FRAME_SIZE)] = np.add(outData[(windowIndex * FRAME_SIZE):((windowIndex + 2) * FRAME_SIZE)], vx)
@@ -274,15 +282,15 @@ for audioFile in audioFiles:
         windowIndex += 1
 
     # Normalize energy
-    eClean = 0
-    for element in outData:
-        eClean += element ** 2
-    eNoisy = 0
-    for element in y:
-        eNoisy += element ** 2
-    ratio = (eNoisy / eClean)
-    outData = outData * ratio
-    outData /= max(outData)
+    # eClean = 0
+    # for element in outData:
+    #     eClean += element ** 2
+    # eNoisy = 0
+    # for element in y:
+    #     eNoisy += element ** 2
+    # ratio = (eNoisy / eClean)
+    # outData = outData * ratio
+    # outData /= max(outData)
 
     # Write output file
     sf.write(os.path.splitext(audioFile)[0] + ".clean.wav", outData, sr, subtype='PCM_16')

@@ -6,7 +6,10 @@ import numpy as np
 import h5py
 import sys
 
-ORIGINAL_FEATURES = 42
+if sys.argv[4] == 'training':
+    ORIGINAL_FEATURES = 87
+else:
+    ORIGINAL_FEATURES = 42
 
 # Load original RNNoise features
 vdata = np.fromfile(sys.argv[1], dtype='float32')

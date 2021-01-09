@@ -20,6 +20,7 @@ import h5py
 from keras.constraints import Constraint
 from keras import backend as K
 import numpy as np
+import sys
 
 #import tensorflow as tf
 #from keras.backend.tensorflow_backend import set_session
@@ -64,8 +65,10 @@ with h5py.File(sys.argv[1], 'r') as hf:
     all_data = hf['data'][:]
 print('done.')
 
+extraFeatures = 3
+
 print('Build model...')
-main_input = Input(shape=(None, all_data.shape[1]), name='main_input')
+main_input = Input(shape=(None, 42+extraFeatures), name='main_input')
 tmp = Dense(24, activation='tanh', name='input_dense', kernel_constraint=constraint, bias_constraint=constraint)(main_input)
 vad_gru = GRU(24, activation='tanh', recurrent_activation='sigmoid', return_sequences=True, name='vad_gru', kernel_regularizer=regularizers.l2(reg), recurrent_regularizer=regularizers.l2(reg), kernel_constraint=constraint, recurrent_constraint=constraint, bias_constraint=constraint)(tmp)
 vad_output = Dense(1, activation='sigmoid', name='vad_output', kernel_constraint=constraint, bias_constraint=constraint)(vad_gru)
@@ -90,16 +93,16 @@ window_size = 2000
 
 nb_sequences = len(all_data)//window_size
 print(nb_sequences, ' sequences')
-x_train = all_data[:nb_sequences*window_size, :all_data.shape[1]]
-x_train = np.reshape(x_train, (nb_sequences, window_size, all_data.shape[1]))
+x_train = all_data[:nb_sequences*window_size, :42+extraFeatures]
+x_train = np.reshape(x_train, (nb_sequences, window_size, 42+extraFeatures))
 
-y_train = np.copy(all_data[:nb_sequences*window_size, all_data.shape[1]:all_data.shape[1] + 22])
+y_train = np.copy(all_data[:nb_sequences*window_size, 42+extraFeatures:42+extraFeatures + 22])
 y_train = np.reshape(y_train, (nb_sequences, window_size, 22))
 
-noise_train = np.copy(all_data[:nb_sequences*window_size, all_data.shape[1] + 22:all_data.shape[1] + 44])
+noise_train = np.copy(all_data[:nb_sequences*window_size, 42+extraFeatures + 22:42+extraFeatures + 44])
 noise_train = np.reshape(noise_train, (nb_sequences, window_size, 22))
 
-vad_train = np.copy(all_data[:nb_sequences*window_size, all_data.shape[1] + 44:all_data.shape[1] + 45])
+vad_train = np.copy(all_data[:nb_sequences*window_size, 42+extraFeatures + 44:42+extraFeatures + 45])
 vad_train = np.reshape(vad_train, (nb_sequences, window_size, 1))
 
 all_data = 0

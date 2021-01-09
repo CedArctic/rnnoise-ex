@@ -261,15 +261,15 @@ for window in inWindows:
     windowIndex += 1
 
 # Normalize energy
-eClean = 0
-for element in outData:
-    eClean += element ** 2
-eNoisy = 0
-for element in y:
-    eNoisy += element ** 2
-ratio = (eNoisy / eClean)
-outData = outData * ratio
-outData /= max(outData)
+# eClean = 0
+# for element in outData:
+#     eClean += element ** 2
+# eNoisy = 0
+# for element in y:
+#     eNoisy += element ** 2
+# ratio = (eNoisy / eClean)
+# outData = outData * ratio
+# outData /= max(outData)
 
 # Write output file
 sf.write(sys.argv[4], outData, sr, subtype='PCM_16')

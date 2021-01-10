@@ -40,30 +40,7 @@
 #include "arch.h"
 #include "rnn.h"
 #include "rnn_data.h"
-
-#define FRAME_SIZE_SHIFT 2
-#define FRAME_SIZE (120<<FRAME_SIZE_SHIFT)
-#define WINDOW_SIZE (2*FRAME_SIZE)
-#define FREQ_SIZE (FRAME_SIZE + 1)
-
-#define PITCH_MIN_PERIOD 60
-#define PITCH_MAX_PERIOD 768
-#define PITCH_FRAME_SIZE 960
-#define PITCH_BUF_SIZE (PITCH_MAX_PERIOD+PITCH_FRAME_SIZE)
-
-#define SQUARE(x) ((x)*(x))
-
-#define NB_BANDS 22
-
-#define CEPS_MEM 8
-#define NB_DELTA_CEPS 6
-
-#define NB_FEATURES (NB_BANDS+3*NB_DELTA_CEPS+2)
-
-
-#ifndef TRAINING
-#define TRAINING 0
-#endif
+#include "denoise.h"
 
 
 /* The built-in model, used if no file is given as input */
@@ -82,20 +59,6 @@ typedef struct {
   float half_window[FRAME_SIZE];
   float dct_table[NB_BANDS*NB_BANDS];
 } CommonState;
-
-struct DenoiseState {
-  float analysis_mem[FRAME_SIZE];
-  float cepstral_mem[CEPS_MEM][NB_BANDS];
-  int memid;
-  float synthesis_mem[FRAME_SIZE];
-  float pitch_buf[PITCH_BUF_SIZE];
-  float pitch_enh_buf[PITCH_BUF_SIZE];
-  float last_gain;
-  int last_period;
-  float mem_hp_x[2];
-  float lastg[NB_BANDS];
-  RNNState rnn;
-};
 
 void compute_band_energy(float *bandE, const kiss_fft_cpx *X) {
   int i;
@@ -309,7 +272,7 @@ static void frame_analysis(DenoiseState *st, kiss_fft_cpx *X, float *Ex, const f
   compute_band_energy(Ex, X);
 }
 
-static int compute_frame_features(DenoiseState *st, kiss_fft_cpx *X, kiss_fft_cpx *P,
+int compute_frame_features(DenoiseState *st, kiss_fft_cpx *X, kiss_fft_cpx *P,
                                   float *Ex, float *Ep, float *Exp, float *features, const float *in) {
   int i;
   float E = 0;
@@ -425,7 +388,7 @@ static void frame_synthesis(DenoiseState *st, float *out, const kiss_fft_cpx *y)
   RNN_COPY(st->synthesis_mem, &x[FRAME_SIZE], FRAME_SIZE);
 }
 
-static void biquad(float *y, float mem[2], const float *x, const float *b, const float *a, int N) {
+void biquad(float *y, float mem[2], const float *x, const float *b, const float *a, int N) {
   int i;
   for (i=0;i<N;i++) {
     float xi, yi;
@@ -488,10 +451,13 @@ float rnnoise_process_frame(DenoiseState *st, float *out, const float *in) {
   static const float a_hp[2] = {-1.99599, 0.99600};
   static const float b_hp[2] = {-2, 1};
   biquad(x, st->mem_hp_x, in, b_hp, a_hp, FRAME_SIZE);
+
   silence = compute_frame_features(st, X, P, Ex, Ep, Exp, features, x);
 
   if (!silence) {
+    
     compute_rnn(&st->rnn, g, &vad_prob, features);
+
     pitch_filter(X, P, Ex, Ep, Exp, g);
     for (i=0;i<NB_BANDS;i++) {
       float alpha = .6f;
@@ -645,8 +611,12 @@ int main(int argc, char **argv) {
     // Join noise and sound samples
     for (i=0;i<FRAME_SIZE;i++) xn[i] = x[i] + n[i];
 
+    // Cast xn to short
+    for (i=0;i<FRAME_SIZE;i++) tmp[i] = xn[i];
+
     // Write noisy samples to file
-    fwrite(xn, sizeof(float), FRAME_SIZE, fout);
+    fwrite(tmp, sizeof(short), FRAME_SIZE, fout);
+    // fwrite(xn, sizeof(float), FRAME_SIZE, fout);
 
     if (E > 1e9f) {
       vad_cnt=0;

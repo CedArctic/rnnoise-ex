@@ -258,9 +258,9 @@ for window in inWindows:
         X[i] = complex((X[i].real * gf[i]), (X[i].imag * gf[i]))
 
     # Synthesize frames
-    fftWindow = np.concatenate([fftWindow, np.zeros(FRAME_SIZE-1)])
+    X = np.concatenate([X, np.zeros(FRAME_SIZE-1)])
     for i in range(FREQ_SIZE, WINDOW_SIZE):
-        fftWindow[i] = np.complex(fftWindow[WINDOW_SIZE-i].real, -fftWindow[WINDOW_SIZE-i].imag)
+        X[i] = np.complex(X[WINDOW_SIZE-i].real, -X[WINDOW_SIZE-i].imag)
     x = np.fft.ifft(X, n=WINDOW_SIZE)
     vx = vorbis_window(x)
     outData[(windowIndex * FRAME_SIZE):((windowIndex + 2) * FRAME_SIZE)] = np.add(outData[(windowIndex * FRAME_SIZE):((windowIndex + 2) * FRAME_SIZE)], vx)

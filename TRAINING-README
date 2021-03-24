@@ -16,7 +16,7 @@
     cd ../src; python ./featureExtraction.py training noisySpeechSamples.raw trainingExtendedFeatures.h5 count
 
 (5) Join feature sets using bin2hdf5
-    cd ../training; ./bin2hdf5.py ../src/trainingRNNoiseFeatures.f32 ../src/trainingExtendedFeatures.bin trainingFeatures.h5
+    cd ../training; ./bin2hdf5.py ../src/trainingRNNoiseFeatures.f32 ../src/trainingExtendedFeatures.h5 trainingFeatures.h5
 
 (6) Train RNNoise
     ./rnn_train.py trainingFeatures.h5 trainedModel.hdf5

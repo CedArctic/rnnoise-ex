@@ -17,8 +17,8 @@ vdataY = int(vdata.size/ORIGINAL_FEATURES)
 vdata = np.reshape(vdata, (vdataY, ORIGINAL_FEATURES))
 
 # Load extended features
-exFeatFile = open(sys.argv[2], 'rb')
-exdata = np.load(exFeatFile)
+exFeatFile = h5py.File(sys.argv[2], 'r')
+exdata = np.array([exFeatFile.get('centroid'), exFeatFile.get('bandwidth'), exFeatFile.get('rolloff')]).T
 exFeatFile.close()
 
 # Concatenate the matrices

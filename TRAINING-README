@@ -12,8 +12,8 @@
     cd ../src;
     ./denoise_training ../speech/trainingSpeech.raw ../noise/trainingNoise.raw count > trainingRNNoiseFeatures.f32
 
-(4) Extract extended features by running featureExtraction.py. Features will be saved as trainingExtendedFeatures.bin
-    cd ../src; python ./featureExtraction.py training noisySpeechSamples.raw trainingExtendedFeatures.bin
+(4) Extract extended features by running featureExtraction.py. Features will be saved as trainingExtendedFeatures.h5
+    cd ../src; python ./featureExtraction.py training noisySpeechSamples.raw trainingExtendedFeatures.h5 count
 
 (5) Join feature sets using bin2hdf5
     cd ../training; ./bin2hdf5.py ../src/trainingRNNoiseFeatures.f32 ../src/trainingExtendedFeatures.bin trainingFeatures.h5

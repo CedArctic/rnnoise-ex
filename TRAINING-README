@@ -41,3 +41,6 @@
 
 (6) Run RNNoise using evaluation.py
     python ./evaluation.py trainedModel.hdf5 testAudioFeatures.h5 ../featureExtraction/testAudio.wav testAudioClean.wav
+
+(6a) If you want to batch evaluate a folder with wav files use
+    python ./evaluation_batch.py noisyWavsDirectory/ trainedModel.hdf5

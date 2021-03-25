@@ -22,12 +22,12 @@ do
 done < ../log_testset.csv
 
 # Clean up work directory
-rm *.f32; rm *.raw; rm *.h5; rm *.bin;
+# rm *.f32; rm *.raw; rm *.h5; rm *.bin;
 
 cd ..
 
 # Run RNNoise
-python3.8 ./training/evaluation.py model_ex.hdf5
+python3.8 ./training/evaluation_batch.py noisy_testset_wav model_ex.hdf5
 
 # Categorize files
 while IFS=, read -r file scene db; 

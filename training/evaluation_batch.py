@@ -149,11 +149,11 @@ class WeightClip(Constraint):
 
 
 # Load model
-model = keras.models.load_model(filepath=sys.argv[1], custom_objects={'WeightClip': WeightClip, 
+model = keras.models.load_model(filepath=sys.argv[2], custom_objects={'WeightClip': WeightClip, 
 'mycost':mycost, 'my_crossentropy':my_crossentropy, 'mymask':mymask, 'msse': msse, 'my_accuracy': my_accuracy})
 
 # Get list of audio files
-audioFilesPath = "../noisy_testset_wav/"
+audioFilesPath = sys.argv[1]
 audioFiles = [f for f in glob.glob(audioFilesPath + "*.wav")]
 
 fileCounter = 0

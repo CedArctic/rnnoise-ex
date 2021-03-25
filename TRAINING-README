@@ -16,7 +16,7 @@
     cd ../src; python ./featureExtraction.py training noisySpeechSamples.raw trainingExtendedFeatures.h5 count
 
 (5) Join feature sets using bin2hdf5
-    cd ../training; ./bin2hdf5.py ../src/trainingRNNoiseFeatures.f32 ../src/trainingExtendedFeatures.h5 trainingFeatures.h5
+    cd ../training; ./bin2hdf5.py ../src/trainingRNNoiseFeatures.f32 ../src/trainingExtendedFeatures.h5 trainingFeatures.h5 training
 
 (6) Train RNNoise
     ./rnn_train.py trainingFeatures.h5 trainedModel.hdf5
@@ -34,10 +34,10 @@
     ./feature_extractor testAudio.raw testAudioFeatures.f32
 
 (4) Extract extended features using featureExtraction.py
-    python ../training/featureExtraction.py testing testAudio.wav testAudioExtendedFeatures.bin
+    python ../training/featureExtraction.py testing testAudio.wav testAudioExtendedFeatures.h5
 
 (5) Join feature sets using bin2hdf5
-    cd ../training; ./bin2hdf5.py ../featureExtraction/testAudioFeatures.f32 ../featureExtraction/testAudioExtendedFeatures.bin testAudioFeatures.h5
+    cd ../training; ./bin2hdf5.py ../featureExtraction/testAudioFeatures.f32 ../featureExtraction/testAudioExtendedFeatures.h5 testAudioFeatures.h5 testing
 
 (6) Run RNNoise using evaluation.py
     python ./evaluation.py trainedModel.hdf5 testAudioFeatures.h5 ../featureExtraction/testAudio.wav testAudioClean.wav

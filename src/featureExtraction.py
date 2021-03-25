@@ -5,28 +5,45 @@ import soundfile as sf
 import sys
 import h5py
 
-# Total number of 10ms frames that will be processed
-totalFrames = int(sys.argv[4])
-
 # Sampling rate
 samplingRate = 48000
 
-# Number of samples to process per batch
-batch_size = 1000 * samplingRate
+# Set up for training
+if sys.argv[1] == 'training':
+    # Total number of 10ms frames that will be processed
+    totalFrames = int(sys.argv[4])
 
-# Βatches of samples. Division by 100 is due to the 10ms duration of each frame in totalFrames
-batches = int(totalFrames * samplingRate / (batch_size * 100))
+    # Number of samples to process per batch
+    batch_size = 1000 * samplingRate
 
-# Number of RNNoise frames to which each batch of samples maps to
-frames_per_batch = int(totalFrames / batches)
+    # Βatches of samples. Division by 100 is due to the 10ms duration of each frame in totalFrames
+    batches = int(totalFrames * samplingRate / (batch_size * 100))
+
+    # Number of RNNoise frames to which each batch of samples maps to
+    frames_per_batch = int(totalFrames / batches)
+
+    # Initiallize vectors
+    spectral_centroid = np.zeros(shape=(totalFrames))
+    spectral_bandwidth = np.zeros(shape=(totalFrames))
+    spectral_rolloff = np.zeros(shape=(totalFrames))
+
+# Set up for testing
+else:
+    # Load the sample wav file with its sampling rate
+    y, sr = sf.read(sys.argv[2])
+
+    # Each frame is 10ms
+    totalFrames = int(len(y) / 48000) * 100 
+
+    batch_size = len(y)
+
+    batches = 1
+
+    frames_per_batch = totalFrames
+
 
 # Open an h5 file for output
 hf = h5py.File(sys.argv[3], 'w')
-
-# Initiallize vectors
-spectral_centroid = np.zeros(shape=(totalFrames))
-spectral_bandwidth = np.zeros(shape=(totalFrames))
-spectral_rolloff = np.zeros(shape=(totalFrames))
 
 # Process batches
 for batch_num in range(batches):
@@ -51,12 +68,18 @@ for batch_num in range(batches):
     # Spectral centroid
     spectral_centroid_t = librosa.feature.spectral_centroid(y=y, sr=sr, n_fft=960, hop_length=480)
     spectral_centroid_t = np.reshape(spectral_centroid_t, newshape=(-1))
-    spectral_centroid[batch_num*frames_per_batch:(batch_num+1)*frames_per_batch] = spectral_centroid_t[:-1]
+    if sys.argv[1] == 'training':
+        spectral_centroid[batch_num*frames_per_batch:(batch_num+1)*frames_per_batch] = spectral_centroid_t[:-1]
+    else:
+        spectral_centroid = spectral_centroid_t[:-1]
 
     # Spectral bandwidth
     spectral_bandwidth_t = librosa.feature.spectral_bandwidth(y=y, sr=sr, n_fft=960, hop_length=480)
     spectral_bandwidth_t = np.reshape(spectral_bandwidth_t, newshape=(-1))
-    spectral_bandwidth[batch_num*frames_per_batch:(batch_num+1)*frames_per_batch] = spectral_bandwidth_t[:-1]
+    if sys.argv[1] == 'training':
+        spectral_bandwidth[batch_num*frames_per_batch:(batch_num+1)*frames_per_batch] = spectral_bandwidth_t[:-1]
+    else:
+        spectral_bandwidth = spectral_bandwidth_t[:-1]
 
     # Spectral flatness
     #spectral_flatness = librosa.feature.spectral_flatness(y=y, n_fft=960, hop_length=480)
@@ -64,7 +87,11 @@ for batch_num in range(batches):
     # Spectral roll-off frequency
     spectral_rolloff_t = librosa.feature.spectral_rolloff(y=y, sr=sr, n_fft=960, hop_length=480)
     spectral_rolloff_t = np.reshape(spectral_rolloff_t, newshape=(-1))
-    spectral_rolloff[batch_num*frames_per_batch:(batch_num+1)*frames_per_batch] = spectral_rolloff_t[:-1]
+    if sys.argv[1] == 'training':
+        spectral_rolloff[batch_num*frames_per_batch:(batch_num+1)*frames_per_batch] = spectral_rolloff_t[:-1]
+    else:
+        spectral_rolloff = spectral_rolloff_t[:-1]
+
 
 
 # Normalize and save data

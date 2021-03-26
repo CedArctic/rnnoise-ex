@@ -15,10 +15,10 @@ do
     ../featureExtractor/feature_extractor $file.raw $file.features.f32
 
     # Extract extended features
-    python3.8 ../training/featureExtraction.py testing $file.wav $file.extendedFeatures.bin
+    python3.8 ../src/featureExtraction.py testing $file.wav $file.extendedFeatures.bin
 
     # Join feature sets using bin2hdf5
-    python3.8 ../training/bin2hdf5.py $file.features.f32 $file.extendedFeatures.bin $file.fullFeatures.h5
+    python3.8 ../training/bin2hdf5.py $file.features.f32 $file.extendedFeatures.bin $file.fullFeatures.h5 testing
 done < ../log_testset.csv
 
 # Clean up work directory

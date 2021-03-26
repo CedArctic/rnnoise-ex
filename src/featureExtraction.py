@@ -95,22 +95,40 @@ for batch_num in range(batches):
 
 
 # Normalize and save data
-spectral_centroid_std = np.std(spectral_centroid)
-spectral_centroid_mean = np.mean(spectral_centroid)
-spectral_centroid -= spectral_centroid_mean
-spectral_centroid /= spectral_centroid_std
+if sys.argv[1] == 'training':
+    spectral_centroid_std = np.std(spectral_centroid)
+    spectral_centroid_mean = np.mean(spectral_centroid)
+    spectral_centroid -= spectral_centroid_mean
+    spectral_centroid /= spectral_centroid_std
+    print('Spectral Centroid Std:', spectral_centroid_std)
+    print('Spectral Centroid Mean:', spectral_centroid_mean)
+else:
+    spectral_centroid -= 4112.5994
+    spectral_centroid /= 2842.3116
 hf.create_dataset('centroid', data=spectral_centroid)
 
-spectral_bandwidth_std = np.std(spectral_bandwidth)
-spectral_bandwidth_mean = np.mean(spectral_bandwidth)
-spectral_bandwidth -= spectral_bandwidth_mean
-spectral_bandwidth /= spectral_bandwidth_std
+if sys.argv[1] == 'training':
+    spectral_bandwidth_std = np.std(spectral_bandwidth)
+    spectral_bandwidth_mean = np.mean(spectral_bandwidth)
+    spectral_bandwidth -= spectral_bandwidth_mean
+    spectral_bandwidth /= spectral_bandwidth_std
+    print('Spectral Bandwidth Std:', spectral_bandwidth_std)
+    print('Spectral Bandwidth Mean:', spectral_bandwidth_mean)
+else:
+    spectral_bandwidth -= 4952.0481
+    spectral_bandwidth /= 1936.2998
 hf.create_dataset('bandwidth', data=spectral_bandwidth)
 
-spectral_rolloff_std = np.std(spectral_rolloff)
-spectral_rolloff_mean = np.mean(spectral_rolloff)
-spectral_rolloff -= spectral_rolloff_mean
-spectral_rolloff /= spectral_rolloff_std
+if sys.argv[1] == 'training':
+    spectral_rolloff_std = np.std(spectral_rolloff)
+    spectral_rolloff_mean = np.mean(spectral_rolloff)
+    spectral_rolloff -= spectral_rolloff_mean
+    spectral_rolloff /= spectral_rolloff_std
+    print('Spectral Rolloff Std:', spectral_rolloff_std)
+    print('Spectral Rolloff Mean:', spectral_rolloff_mean)
+else:
+    spectral_rolloff -= 8670.3725
+    spectral_rolloff /= 6298.5521
 hf.create_dataset('rolloff', data=spectral_rolloff)
 
 # Close h5
